@@ -10,8 +10,12 @@ import type {
   ShiftFilter,
   LayersState,
   HeatMode,
+  TaskAnomaly,
+  TaskSearchFilter,
+  AnomalyFlag,
+  TaskSortKey,
 } from '@/types';
-import { mockAPI } from '@/services/mockAPI';
+import { mockAPI, analyzeTaskAnomalies } from '@/services/mockAPI';
 
 function getDefaultTimeRange() {
   const start = new Date('2026-06-16T06:00:00');
@@ -36,12 +40,16 @@ interface AppState {
 
   structure: WarehouseStructure | null;
   tasks: PickTask[];
+  taskAnomalies: Map<string, TaskAnomaly>;
   kpis: KPIData | null;
   congestionZones: CongestionZone[];
   strategyCompare: StrategyCompare[];
   heatGrid: HeatGrid | null;
   loading: boolean;
   error: string | null;
+
+  searchPanelOpen: boolean;
+  searchFilter: TaskSearchFilter;
 
   setTimeRange: (start: string, end: string) => void;
   setShift: (s: ShiftFilter) => void;
@@ -57,6 +65,13 @@ interface AppState {
   setPlaybackProgress: (p: number) => void;
   selectTask: (id: string | null) => void;
   toggleHighlight: (id: string) => void;
+
+  setSearchPanelOpen: (open: boolean) => void;
+  setSearchKeyword: (kw: string) => void;
+  toggleAnomalyOnly: () => void;
+  toggleAnomalyFilter: (flag: AnomalyFlag) => void;
+  togglePickerFilter: (pickerId: string) => void;
+  setTaskSort: (key: TaskSortKey, desc?: boolean) => void;
 
   fetchStructure: () => Promise<void>;
   fetchAll: () => Promise<void>;
@@ -85,12 +100,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   structure: null,
   tasks: [],
+  taskAnomalies: new Map(),
   kpis: null,
   congestionZones: [],
   strategyCompare: [],
   heatGrid: null,
   loading: false,
   error: null,
+
+  searchPanelOpen: false,
+  searchFilter: {
+    keyword: '',
+    anomalyOnly: false,
+    anomalies: [],
+    pickers: [],
+    sortKey: 'time',
+    sortDesc: true,
+  },
 
   setTimeRange: (start, end) => {
     set({ timeRange: { start, end }, playbackProgress: 0 });
@@ -118,12 +144,44 @@ export const useAppStore = create<AppState>((set, get) => ({
   togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
   setPlaybackSpeed: (s) => set({ playbackSpeed: s }),
   setPlaybackProgress: (p) => set({ playbackProgress: Math.max(0, Math.min(1, p)) }),
-  selectTask: (id) => set({ selectedTaskId: id, isPlaying: id ? get().isPlaying : false }),
+  selectTask: (id) => set({ selectedTaskId: id, playbackProgress: 0, isPlaying: false }),
   toggleHighlight: (id) =>
     set((s) => ({
       highlightedTaskIds: s.highlightedTaskIds.includes(id)
         ? s.highlightedTaskIds.filter((x) => x !== id)
         : [...s.highlightedTaskIds, id],
+    })),
+
+  setSearchPanelOpen: (open) => set({ searchPanelOpen: open }),
+  setSearchKeyword: (kw) => set((s) => ({ searchFilter: { ...s.searchFilter, keyword: kw } })),
+  toggleAnomalyOnly: () => set((s) => ({ searchFilter: { ...s.searchFilter, anomalyOnly: !s.searchFilter.anomalyOnly } })),
+  toggleAnomalyFilter: (flag) =>
+    set((s) => {
+      const has = s.searchFilter.anomalies.includes(flag);
+      return {
+        searchFilter: {
+          ...s.searchFilter,
+          anomalies: has ? s.searchFilter.anomalies.filter((x) => x !== flag) : [...s.searchFilter.anomalies, flag],
+        },
+      };
+    }),
+  togglePickerFilter: (pickerId) =>
+    set((s) => {
+      const has = s.searchFilter.pickers.includes(pickerId);
+      return {
+        searchFilter: {
+          ...s.searchFilter,
+          pickers: has ? s.searchFilter.pickers.filter((x) => x !== pickerId) : [...s.searchFilter.pickers, pickerId],
+        },
+      };
+    }),
+  setTaskSort: (key, desc) =>
+    set((s) => ({
+      searchFilter: {
+        ...s.searchFilter,
+        sortKey: key,
+        sortDesc: desc ?? (s.searchFilter.sortKey === key ? !s.searchFilter.sortDesc : true),
+      },
     })),
 
   fetchStructure: async () => {
@@ -155,7 +213,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         mockAPI.getStrategyCompare(params),
         mockAPI.getHeatGrid(params, 1),
       ]);
-      set({ tasks, kpis, congestionZones, strategyCompare, heatGrid, loading: false });
+      set({ tasks, taskAnomalies: analyzeTaskAnomalies(tasks), kpis, congestionZones, strategyCompare, heatGrid, loading: false });
     } catch (e) {
       set({ error: String(e), loading: false });
     }

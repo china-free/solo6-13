@@ -1,14 +1,7 @@
 import { useMemo } from 'react';
-import {
-  RefreshCw,
-  CalendarClock,
-  Layers3,
-  Warehouse,
-  User,
-  Sparkles,
-} from 'lucide-react';
+import { Warehouse, Calendar, Clock, RefreshCw, AlertTriangle, Search, CalendarClock, Layers3, Sparkles, User } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { STRATEGY_LABELS, STRATEGY_COLORS, SHIFT_LABELS } from '@/types';
+import { STRATEGY_LABELS, STRATEGY_COLORS, SHIFT_LABELS, ANOMALY_COLORS } from '@/types';
 import type { StrategyType, ShiftFilter } from '@/types';
 
 const STRATEGIES: StrategyType[] = ['S_SHAPED', 'ZONED_RELAY', 'WAVE_PICKING'];
@@ -48,7 +41,18 @@ export function TopBar() {
     fetchAll,
     loading,
     tasks,
+    taskAnomalies,
+    searchPanelOpen,
+    setSearchPanelOpen,
   } = useAppStore();
+
+  const anomalyCount = useMemo(() => {
+    let n = 0;
+    taskAnomalies.forEach((a) => {
+      if (a.flags.length > 0) n++;
+    });
+    return n;
+  }, [taskAnomalies]);
 
   const startFmt = formatTime(timeRange.start);
   const endFmt = formatTime(timeRange.end);
@@ -207,7 +211,32 @@ export function TopBar() {
         <span className="px-1.5 py-0.5 rounded bg-space-850/60 border border-white/5">
           <span className="text-steel-cyan">{tasks.length}</span> 任务
         </span>
+        {anomalyCount > 0 && (
+          <span
+            className="px-1.5 py-0.5 rounded border flex items-center gap-1"
+            style={{ backgroundColor: `${ANOMALY_COLORS.LONG_DURATION}10`, borderColor: `${ANOMALY_COLORS.LONG_DURATION}33`, color: ANOMALY_COLORS.LONG_DURATION }}
+          >
+            <AlertTriangle className="w-2.5 h-2.5" />
+            {anomalyCount} 异常
+          </span>
+        )}
       </div>
+
+      <button
+        onClick={() => setSearchPanelOpen(!searchPanelOpen)}
+        className={`btn-icon group relative ${searchPanelOpen ? 'bg-cyan-500/15 border-cyan-400/40' : ''}`}
+        title="任务追溯检索 (按任务号/订单/拣货员)"
+      >
+        <Search className={`w-4 h-4 ${searchPanelOpen ? 'text-cyan-300' : ''}`} />
+        {anomalyCount > 0 && !searchPanelOpen && (
+          <span
+            className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full text-[9px] font-bold flex items-center justify-center px-1"
+            style={{ backgroundColor: ANOMALY_COLORS.LONG_DURATION, color: '#0a0f1c' }}
+          >
+            {anomalyCount}
+          </span>
+        )}
+      </button>
 
       <button
         onClick={() => fetchAll()}

@@ -6,6 +6,7 @@ import { TopBar } from '@/components/ui/TopBar';
 import { LeftPanel } from '@/components/ui/LeftPanel';
 import { RightPanel } from '@/components/ui/RightPanel';
 import { BottomDrawer } from '@/components/ui/BottomDrawer';
+import { TaskSearchPanel } from '@/components/ui/TaskSearchPanel';
 
 export default function Home() {
   const { fetchStructure, fetchAll, structure, loading, error } = useAppStore();
@@ -52,6 +53,7 @@ export default function Home() {
           <LeftPanel />
           <RightPanel />
           <BottomDrawer />
+          <TaskSearchPanel />
         </>
       )}
 

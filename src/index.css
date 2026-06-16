@@ -137,3 +137,13 @@ input[type="range"].range-slider::-moz-range-thumb {
   50% { opacity: 0.7; }
 }
 .star { animation: starTwinkle 3s ease-in-out infinite; }
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ChevronUp,
   ChevronDown,
@@ -10,9 +10,10 @@ import {
   Box,
   Clock,
   MapPin,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { STRATEGY_LABELS, STRATEGY_COLORS, SHIFT_LABELS } from '@/types';
+import { STRATEGY_LABELS, STRATEGY_COLORS, SHIFT_LABELS, ANOMALY_COLORS, ANOMALY_LABELS } from '@/types';
 
 function fmtTime(iso: string) {
   const d = new Date(iso);
@@ -28,13 +29,18 @@ function fmtDuration(s: number) {
 }
 
 export function BottomDrawer() {
-  const { selectedTaskId, tasks, selectTask, playbackProgress } = useAppStore();
+  const { selectedTaskId, tasks, selectTask, playbackProgress, taskAnomalies } = useAppStore();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (selectedTaskId) setOpen(true);
+  }, [selectedTaskId]);
 
   const task = tasks.find((t) => t.taskId === selectedTaskId) ?? null;
 
   if (!task) return null;
 
+  const anomaly = taskAnomalies.get(task.taskId);
   const strategyColor = STRATEGY_COLORS[task.strategy] ?? '#00D4FF';
   const currentT = playbackProgress * task.totalDuration;
 
@@ -57,9 +63,19 @@ export function BottomDrawer() {
           </div>
           <div className="flex-1 min-w-0 flex items-center gap-4">
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[11px] text-slate-500 font-mono-num">任务</span>
                 <span className="text-sm font-semibold text-white font-mono-num">{task.taskId}</span>
+                {anomaly && anomaly.flags.length > 0 && anomaly.flags.map((f) => (
+                  <span
+                    key={f}
+                    className="chip text-[10px] font-mono uppercase tracking-wide"
+                    style={{ backgroundColor: `${ANOMALY_COLORS[f]}22`, color: ANOMALY_COLORS[f], borderColor: `${ANOMALY_COLORS[f]}44` }}
+                  >
+                    <AlertTriangle className="w-2.5 h-2.5 mr-0.5 inline-block" />
+                    {ANOMALY_LABELS[f]}
+                  </span>
+                ))}
                 <span
                   className="chip"
                   style={{

@@ -2,6 +2,28 @@ export type StrategyType = 'S_SHAPED' | 'ZONED_RELAY' | 'WAVE_PICKING' | 'ALL';
 export type ShiftType = 'morning' | 'afternoon' | 'night';
 export type ShiftFilter = ShiftType | 'all';
 
+export type AnomalyFlag = 'LONG_DISTANCE' | 'LONG_DURATION' | 'HIGH_REVISIT' | 'SLOW_DWELL';
+export type TaskSortKey = 'time' | 'distance' | 'duration' | 'skuCount';
+
+export interface TaskAnomaly {
+  taskId: string;
+  flags: AnomalyFlag[];
+  distanceScore: number;
+  durationScore: number;
+  revisitScore: number;
+  dwellScore: number;
+  overallScore: number;
+}
+
+export interface TaskSearchFilter {
+  keyword: string;
+  anomalyOnly: boolean;
+  anomalies: AnomalyFlag[];
+  pickers: string[];
+  sortKey: TaskSortKey;
+  sortDesc: boolean;
+}
+
 export interface TimeRangeParams {
   startTime: string;
   endTime: string;
@@ -154,4 +176,18 @@ export const SHIFT_LABELS: Record<ShiftFilter, string> = {
   afternoon: '中班 14-22',
   night: '晚班 22-06',
   all: '全部班次',
+};
+
+export const ANOMALY_LABELS: Record<AnomalyFlag, string> = {
+  LONG_DISTANCE: '超长路径',
+  LONG_DURATION: '超时任务',
+  HIGH_REVISIT: '高回头率',
+  SLOW_DWELL: '停留异常',
+};
+
+export const ANOMALY_COLORS: Record<AnomalyFlag, string> = {
+  LONG_DISTANCE: '#FF8C42',
+  LONG_DURATION: '#FF4D6D',
+  HIGH_REVISIT: '#B794F4',
+  SLOW_DWELL: '#FFC93C',
 };

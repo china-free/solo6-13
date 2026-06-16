@@ -15,6 +15,8 @@ import type {
   StrategyType,
   ShiftType,
   ShiftFilter,
+  TaskAnomaly,
+  AnomalyFlag,
 } from '@/types';
 
 const GROUND_W = 30;
@@ -405,6 +407,81 @@ function computeHeatGrid(tasks: PickTask[], cellSize = 1): HeatGrid {
   }
 
   return { cellSize, cols, rows, cells };
+}
+
+export function analyzeTaskAnomalies(tasks: PickTask[]): Map<string, TaskAnomaly> {
+  const result = new Map<string, TaskAnomaly>();
+  if (tasks.length === 0) return result;
+
+  const dists = tasks.map((t) => t.totalDistance).sort((a, b) => a - b);
+  const durs = tasks.map((t) => t.totalDuration).sort((a, b) => a - b);
+  const p75 = (arr: number[]) => arr[Math.floor(arr.length * 0.75)] || 0;
+  const p90 = (arr: number[]) => arr[Math.floor(arr.length * 0.9)] || 0;
+
+  const dist75 = p75(dists);
+  const dist90 = p90(dists);
+  const dur75 = p75(durs);
+  const dur90 = p90(durs);
+
+  function revisitCount(t: PickTask) {
+    const seen = new Set<string>();
+    let rev = 0;
+    t.nodes.forEach((n) => {
+      if (seen.has(n.rackId)) rev++;
+      seen.add(n.rackId);
+    });
+    return rev;
+  }
+
+  function avgDwell(t: PickTask) {
+    if (t.nodes.length === 0) return 0;
+    return t.nodes.reduce((a, n) => a + n.dwellTime, 0) / t.nodes.length;
+  }
+
+  const avgDwells = tasks.map(avgDwell).sort((a, b) => a - b);
+  const dwell75 = p75(avgDwells);
+  const dwell90 = p90(avgDwells);
+
+  tasks.forEach((t) => {
+    const flags: AnomalyFlag[] = [];
+    let distanceScore = 0;
+    let durationScore = 0;
+    let revisitScore = 0;
+    let dwellScore = 0;
+
+    if (t.totalDistance > dist75) {
+      distanceScore = Math.min(1, (t.totalDistance - dist75) / Math.max(1, dist90 - dist75));
+      if (t.totalDistance > dist90) flags.push('LONG_DISTANCE');
+    }
+    if (t.totalDuration > dur75) {
+      durationScore = Math.min(1, (t.totalDuration - dur75) / Math.max(1, dur90 - dur75));
+      if (t.totalDuration > dur90) flags.push('LONG_DURATION');
+    }
+    const rev = revisitCount(t);
+    if (rev > 0) {
+      revisitScore = Math.min(1, rev / 3);
+      if (rev >= 2) flags.push('HIGH_REVISIT');
+    }
+    const ad = avgDwell(t);
+    if (ad > dwell75) {
+      dwellScore = Math.min(1, (ad - dwell75) / Math.max(1, dwell90 - dwell75));
+      if (ad > dwell90) flags.push('SLOW_DWELL');
+    }
+
+    const overallScore = (distanceScore + durationScore + revisitScore + dwellScore) / 4;
+
+    result.set(t.taskId, {
+      taskId: t.taskId,
+      flags,
+      distanceScore,
+      durationScore,
+      revisitScore,
+      dwellScore,
+      overallScore,
+    });
+  });
+
+  return result;
 }
 
 const STRUCTURE = buildStructure();
