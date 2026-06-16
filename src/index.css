@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #E2E8F0;
+  background-color: #050B18;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0, 212, 255, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(183, 148, 244, 0.05) 0%, transparent 50%),
+    linear-gradient(180deg, #050B18 0%, #0A1628 100%);
+}
+
+.font-mono-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+@layer components {
+  .panel {
+    @apply bg-space-900/70 backdrop-blur-md border border-steel-cyan/15 rounded-xl shadow-panel;
+  }
+  .panel-hover {
+    @apply hover:border-steel-cyan/40 hover:shadow-glow-sm transition-all duration-300;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200;
+  }
+  .chip-active {
+    @apply bg-steel-cyan/15 border-steel-cyan/50 text-steel-cyan shadow-glow-sm;
+  }
+  .chip-idle {
+    @apply bg-space-800/60 border-white/10 text-slate-400 hover:border-white/25 hover:text-slate-200;
+  }
+  .btn-icon {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-lg border border-white/10 bg-space-800/60 text-slate-300 hover:text-steel-cyan hover:border-steel-cyan/40 hover:bg-space-700/60 transition-all duration-200;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-steel-cyan/15 border border-steel-cyan/40 text-steel-cyan hover:bg-steel-cyan/25 hover:shadow-glow-sm transition-all duration-200;
+  }
+  .section-title {
+    @apply text-[11px] font-semibold tracking-[0.14em] uppercase text-steel-cyan/80 pl-1;
+  }
+  .section-underline {
+    @apply h-px w-full bg-gradient-to-r from-steel-cyan/50 via-steel-cyan/10 to-transparent mt-1.5 mb-3;
+  }
+  .kpi-card {
+    @apply relative overflow-hidden rounded-xl bg-space-850/60 border border-white/10 p-3 transition-all duration-300 hover:border-steel-cyan/30;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,212,255,0.3) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(0,212,255,0.25);
+    border-radius: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(0,212,255,0.45);
+  }
+}
+
+input[type="range"].range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(0,212,255,0.6), rgba(0,212,255,0.1));
+  border-radius: 999px;
+  outline: none;
+}
+input[type="range"].range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #00D4FF;
+  border: 2px solid #0A1628;
+  box-shadow: 0 0 10px rgba(0,212,255,0.7);
+  cursor: pointer;
+}
+input[type="range"].range-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #00D4FF;
+  border: 2px solid #0A1628;
+  box-shadow: 0 0 10px rgba(0,212,255,0.7);
+  cursor: pointer;
+}
+
+.tooltip-bubble {
+  background: rgba(10, 22, 40, 0.92);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(0, 212, 255, 0.25);
+}
+
+@keyframes dash {
+  to { stroke-dashoffset: -24; }
+}
+.animated-dash {
+  stroke-dasharray: 6 6;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes starTwinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.7; }
+}
+.star { animation: starTwinkle 3s ease-in-out infinite; }
