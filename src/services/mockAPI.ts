@@ -484,6 +484,61 @@ export function analyzeTaskAnomalies(tasks: PickTask[]): Map<string, TaskAnomaly
   return result;
 }
 
+export interface ZoneDwellEntry {
+  zoneId: string;
+  zoneName: string;
+  dwellTime: number;
+  nodeCount: number;
+  skuQty: number;
+  pct: number;
+}
+
+export function computeTaskZoneDwell(task: PickTask, structure: WarehouseStructure): ZoneDwellEntry[] {
+  const rackZoneMap = new Map<string, Zone>();
+  structure.racks.forEach((r) => {
+    const z = structure.zones.find((zz) => zz.id === r.zoneId);
+    if (z) rackZoneMap.set(r.id, z);
+  });
+  const agg = new Map<string, { zone: Zone; dwell: number; nodes: number; qty: number }>();
+  let total = 0;
+  task.nodes.forEach((n) => {
+    const z = rackZoneMap.get(n.rackId);
+    if (!z) return;
+    const cur = agg.get(z.id) || { zone: z, dwell: 0, nodes: 0, qty: 0 };
+    cur.dwell += n.dwellTime;
+    cur.nodes += 1;
+    cur.qty += n.skuQty;
+    total += n.dwellTime;
+    agg.set(z.id, cur);
+  });
+  const arr = Array.from(agg.entries()).map(([id, v]) => ({
+    zoneId: id,
+    zoneName: v.zone.name,
+    dwellTime: Math.round(v.dwell),
+    nodeCount: v.nodes,
+    skuQty: v.qty,
+    pct: total > 0 ? Math.round((v.dwell / total) * 100) : 0,
+  }));
+  return arr.sort((a, b) => b.dwellTime - a.dwellTime);
+}
+
+export function taskVisitsZones(task: PickTask, structure: WarehouseStructure, zoneIds: string[]): boolean {
+  if (zoneIds.length === 0) return true;
+  const rackZoneMap = new Map<string, string>();
+  structure.racks.forEach((r) => rackZoneMap.set(r.id, r.zoneId));
+  return task.nodes.some((n) => zoneIds.includes(rackZoneMap.get(n.rackId) ?? ''));
+}
+
+export interface RackToZoneMap {
+  get(rackId: string): string | undefined;
+}
+
+export function buildRackZoneMap(structure: WarehouseStructure): Map<string, string> {
+  const m = new Map<string, string>();
+  structure.racks.forEach((r) => m.set(r.id, r.zoneId));
+  return m;
+}
+
 const STRUCTURE = buildStructure();
 const ALL_TASKS = buildTasks(STRUCTURE, 200);
 

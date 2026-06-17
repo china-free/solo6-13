@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import { EffectComposer, Bloom, FXAA } from '@react-three/postprocessing';
 import * as THREE from 'three';
-import { Suspense, useMemo } from 'react';
+import { Suspense, useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { WarehouseGround } from './WarehouseGround';
 import { WarehouseRacks } from './WarehouseRacks';
@@ -10,11 +10,40 @@ import { TaskPaths } from './TaskPaths';
 import { HeatOverlay } from './HeatOverlay';
 import { PlaybackAgents } from './PlaybackAgents';
 import { ZoneLabels } from './ZoneLabels';
+import { ZoneSelectionOverlay } from './ZoneSelectionOverlay';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 export function WarehouseScene() {
-  const { structure } = useAppStore();
+  const { structure, drillDownZoneId } = useAppStore();
   const halfW = (structure?.groundSize.width ?? 30) / 2;
   const halfD = (structure?.groundSize.depth ?? 20) / 2;
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
+
+  useEffect(() => {
+    if (!drillDownZoneId || !structure || !controlsRef.current) return;
+    const zone = structure.zones.find((z) => z.id === drillDownZoneId);
+    if (!zone) return;
+    const cx = zone.bounds.x + zone.bounds.w / 2;
+    const cz = zone.bounds.z + zone.bounds.d / 2;
+    const fit = Math.max(zone.bounds.w, zone.bounds.d) * 1.8;
+    const ctrl = controlsRef.current;
+    const startTarget = ctrl.target.clone();
+    const endTarget = new THREE.Vector3(cx, 0, cz);
+    const startPos = ctrl.object.position.clone();
+    const endPos = new THREE.Vector3(cx - fit * 0.6, fit * 0.8, cz + fit * 0.6);
+    let t = 0;
+    const dur = 550;
+    const start = performance.now();
+    function step() {
+      t = Math.min(1, (performance.now() - start) / dur);
+      const e = 1 - Math.pow(1 - t, 3);
+      ctrl.target.lerpVectors(startTarget, endTarget, e);
+      ctrl.object.position.lerpVectors(startPos, endPos, e);
+      ctrl.update();
+      if (t < 1) requestAnimationFrame(step);
+    }
+    step();
+  }, [drillDownZoneId, structure]);
 
   const cameraPos = useMemo(() => new THREE.Vector3(halfW * 1.4, 22, halfD * 2.1), [halfW, halfD]);
 
@@ -56,8 +85,10 @@ export function WarehouseScene() {
         <TaskPaths />
         <HeatOverlay />
         <PlaybackAgents />
+        <ZoneSelectionOverlay />
 
         <OrbitControls
+          ref={(el) => { controlsRef.current = el; }}
           enableDamping
           dampingFactor={0.06}
           minDistance={6}

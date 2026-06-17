@@ -51,6 +51,9 @@ interface AppState {
   searchPanelOpen: boolean;
   searchFilter: TaskSearchFilter;
 
+  drillDownZoneId: string | null;
+  drillDownCongestionId: string | null;
+
   setTimeRange: (start: string, end: string) => void;
   setShift: (s: ShiftFilter) => void;
   toggleStrategy: (s: StrategyType) => void;
@@ -72,6 +75,11 @@ interface AppState {
   toggleAnomalyFilter: (flag: AnomalyFlag) => void;
   togglePickerFilter: (pickerId: string) => void;
   setTaskSort: (key: TaskSortKey, desc?: boolean) => void;
+
+  setDrillDownZoneId: (id: string | null) => void;
+  setDrillDownCongestionId: (id: string | null) => void;
+  toggleZoneFilter: (zoneId: string) => void;
+  clearDrillDown: () => void;
 
   fetchStructure: () => Promise<void>;
   fetchAll: () => Promise<void>;
@@ -114,9 +122,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     anomalyOnly: false,
     anomalies: [],
     pickers: [],
+    zones: [],
+    strategies: [],
     sortKey: 'time',
     sortDesc: true,
   },
+
+  drillDownZoneId: null,
+  drillDownCongestionId: null,
 
   setTimeRange: (start, end) => {
     set({ timeRange: { start, end }, playbackProgress: 0 });
@@ -181,6 +194,42 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...s.searchFilter,
         sortKey: key,
         sortDesc: desc ?? (s.searchFilter.sortKey === key ? !s.searchFilter.sortDesc : true),
+      },
+    })),
+  toggleZoneFilter: (zoneId) =>
+    set((s) => {
+      const has = s.searchFilter.zones.includes(zoneId);
+      return {
+        searchFilter: {
+          ...s.searchFilter,
+          zones: has ? s.searchFilter.zones.filter((x) => x !== zoneId) : [...s.searchFilter.zones, zoneId],
+        },
+      };
+    }),
+  setDrillDownZoneId: (id) =>
+    set((s) => {
+      const next = s.drillDownZoneId === id ? null : id;
+      return {
+        drillDownZoneId: next,
+        drillDownCongestionId: null,
+        searchFilter: {
+          ...s.searchFilter,
+          zones: next ? [next] : s.searchFilter.zones.filter((x) => false),
+        },
+      };
+    }),
+  setDrillDownCongestionId: (id) =>
+    set((s) => {
+      const next = s.drillDownCongestionId === id ? null : id;
+      return { drillDownCongestionId: next };
+    }),
+  clearDrillDown: () =>
+    set((s) => ({
+      drillDownZoneId: null,
+      drillDownCongestionId: null,
+      searchFilter: {
+        ...s.searchFilter,
+        zones: [],
       },
     })),
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   ChevronUp,
   ChevronDown,
@@ -11,9 +11,12 @@ import {
   Clock,
   MapPin,
   AlertTriangle,
+  Layers,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { STRATEGY_LABELS, STRATEGY_COLORS, SHIFT_LABELS, ANOMALY_COLORS, ANOMALY_LABELS } from '@/types';
+import { computeTaskZoneDwell, type ZoneDwellEntry } from '@/services/mockAPI';
 
 function fmtTime(iso: string) {
   const d = new Date(iso);
@@ -29,7 +32,7 @@ function fmtDuration(s: number) {
 }
 
 export function BottomDrawer() {
-  const { selectedTaskId, tasks, selectTask, playbackProgress, taskAnomalies } = useAppStore();
+  const { selectedTaskId, tasks, selectTask, playbackProgress, taskAnomalies, structure, strategyCompare } = useAppStore();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -38,6 +41,24 @@ export function BottomDrawer() {
 
   const task = tasks.find((t) => t.taskId === selectedTaskId) ?? null;
 
+  const zoneDwell = useMemo<ZoneDwellEntry[]>(() => {
+    if (!task || !structure) return [];
+    return computeTaskZoneDwell(task, structure);
+  }, [task, structure]);
+
+  const strategyBenchmark = useMemo(() => {
+    if (!task) return null;
+    const avg = strategyCompare.find((s) => s.strategy === task.strategy);
+    if (!avg) return null;
+    return {
+      distPct: Math.round(((task.totalDistance - avg.avgDistance) / avg.avgDistance) * 100),
+      durPct: Math.round(((task.totalDuration - avg.avgDuration) / avg.avgDuration) * 100),
+      revisitDiff: Math.round((task.nodes.length - task.nodes.filter((n, i, arr) => arr.findIndex((x) => x.rackId === n.rackId) === i).length) / Math.max(1, task.nodes.length) * 100 - avg.revisitRate * 100),
+      avgDistance: avg.avgDistance,
+      avgDuration: avg.avgDuration,
+    };
+  }, [task, strategyCompare]);
+
   if (!task) return null;
 
   const anomaly = taskAnomalies.get(task.taskId);
@@ -45,7 +66,7 @@ export function BottomDrawer() {
   const currentT = playbackProgress * task.totalDuration;
 
   return (
-    <div className="absolute left-[300px] right-[340px] bottom-3 z-10">
+    <div className="absolute left-[340px] right-[340px] bottom-3 z-10">
       <div className="panel rounded-xl overflow-hidden transition-all duration-300" style={{ maxHeight: open ? 300 : 56 }}>
         <div
           className="h-14 px-4 flex items-center gap-3 cursor-pointer select-none hover:bg-space-800/40 transition-colors"
@@ -128,7 +149,7 @@ export function BottomDrawer() {
         </div>
 
         {open && (
-          <div className="border-t border-white/10 px-4 py-3 grid grid-cols-[320px_1fr] gap-4" style={{ height: 244 }}>
+          <div className="border-t border-white/10 px-4 py-3 grid grid-cols-[260px_300px_1fr] gap-4" style={{ height: 244 }}>
             <div className="flex flex-col gap-3 overflow-hidden">
               <div>
                 <div className="section-title">任务概览</div>
@@ -141,13 +162,92 @@ export function BottomDrawer() {
                 </div>
               </div>
               <div className="flex-1 min-h-0">
-                <div className="section-title">时间分布</div>
-                <div className="section-underline" />
-                <div className="space-y-1 pr-1">
-                  <TimeBar label="移动时间" pct={62} color="#00D4FF" value={fmtDuration(task.totalDuration * 0.62)} />
-                  <TimeBar label="拣货停留" pct={32} color="#FFC93C" value={fmtDuration(task.totalDuration * 0.32)} />
-                  <TimeBar label="其他等待" pct={6} color="#B794F4" value={fmtDuration(task.totalDuration * 0.06)} />
+                <div className="section-title flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-steel-cyan" />
+                  区域停留分布
                 </div>
+                <div className="section-underline" />
+                <div className="space-y-1 pr-1 max-h-[130px] overflow-y-auto scrollbar-thin">
+                  {zoneDwell.length === 0 ? (
+                    <div className="text-[10px] text-slate-500 text-center py-3">无区域数据</div>
+                  ) : (
+                    zoneDwell.map((z) => {
+                      const zoneColor = structure?.zones.find((zz) => zz.id === z.zoneId)?.color || '#00D4FF';
+                      return (
+                        <div key={z.zoneId} className="group">
+                          <div className="flex items-center justify-between text-[10px] mb-0.5">
+                            <span className="flex items-center gap-1">
+                              <span
+                                className="w-1.5 h-1.5 rounded-sm"
+                                style={{ backgroundColor: zoneColor }}
+                              />
+                              <span className="text-slate-300 font-semibold">{z.zoneName}</span>
+                              <span className="text-slate-500">
+                                {z.nodeCount}站 · {z.skuQty}件
+                              </span>
+                            </span>
+                            <span className="text-slate-400 font-mono-num">
+                              {fmtDuration(z.dwellTime)} · {z.pct}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-space-700/70 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${z.pct}%`,
+                                background: `linear-gradient(90deg, ${zoneColor}88, ${zoneColor})`,
+                                boxShadow: `0 0 6px ${zoneColor}44`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 overflow-hidden">
+              <div>
+                <div className="section-title flex items-center gap-1">
+                  <ArrowRightLeft className="w-3 h-3 text-steel-cyan" />
+                  同策略基准对比
+                  <span
+                    className="chip ml-auto text-[9px] font-mono py-0 h-4"
+                    style={{ backgroundColor: `${strategyColor}22`, color: strategyColor, borderColor: `${strategyColor}55` }}
+                  >
+                    {STRATEGY_LABELS[task.strategy]}
+                  </span>
+                </div>
+                <div className="section-underline" />
+                {strategyBenchmark ? (
+                  <div className="space-y-1.5 mt-1">
+                    <BenchmarkRow
+                      label="路径长度"
+                      taskVal={`${task.totalDistance.toFixed(0)}m`}
+                      baseVal={`${strategyBenchmark.avgDistance.toFixed(0)}m`}
+                      pct={strategyBenchmark.distPct}
+                      icon={Route}
+                    />
+                    <BenchmarkRow
+                      label="任务耗时"
+                      taskVal={fmtDuration(task.totalDuration)}
+                      baseVal={fmtDuration(strategyBenchmark.avgDuration)}
+                      pct={strategyBenchmark.durPct}
+                      icon={Timer}
+                    />
+                    <BenchmarkRow
+                      label="回头率"
+                      taskVal={`${Math.round((task.nodes.filter((n, i, arr) => arr.findIndex((x) => x.rackId === n.rackId) !== i).length / Math.max(1, task.nodes.length)) * 100)}%`}
+                      baseVal={`${Math.round(strategyCompare.find((s) => s.strategy === task.strategy)?.revisitRate! * 100)}%`}
+                      pct={strategyBenchmark.revisitDiff}
+                      icon={Layers}
+                    />
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-slate-500 text-center py-3">加载中...</div>
+                )}
               </div>
             </div>
 
@@ -280,6 +380,46 @@ function TimeBar({ label, pct, color, value }: { label: string; pct: number; col
             boxShadow: `0 0 8px ${color}55`,
           }}
         />
+      </div>
+    </div>
+  );
+}
+
+function BenchmarkRow({
+  label,
+  taskVal,
+  baseVal,
+  pct,
+  icon: Icon,
+}: {
+  label: string;
+  taskVal: string;
+  baseVal: string;
+  pct: number;
+  icon: typeof Package;
+}) {
+  const isGood = label === '路径长度' || label === '任务耗时' || label === '回头率' ? pct < 0 : pct > 0;
+  const color = Math.abs(pct) < 10 ? '#64748b' : isGood ? '#00FF94' : '#FF4D6D';
+  const displayPct = pct === 0 ? '±0' : pct > 0 ? `+${pct}` : `${pct}`;
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-space-850/40 border border-white/5 px-2 py-1.5">
+      <div
+        className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+        style={{ background: `${color}15`, border: `1px solid ${color}30` }}
+      >
+        <Icon className="w-2.5 h-2.5" style={{ color }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-slate-400">{label}</span>
+          <span className="font-mono-num font-bold" style={{ color }}>
+            {displayPct}%
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-[9px] mt-0.5">
+          <span className="text-slate-300 font-mono-num">任务 {taskVal}</span>
+          <span className="text-slate-500 font-mono-num">均值 {baseVal}</span>
+        </div>
       </div>
     </div>
   );

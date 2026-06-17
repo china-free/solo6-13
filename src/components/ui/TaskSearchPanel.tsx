@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Search, X, Filter, AlertTriangle, User, Package, Timer, Route, ChevronDown, ChevronUp, ZoomIn, FilterX } from 'lucide-react';
+import { Search, X, Filter, AlertTriangle, User, Package, Timer, Route, ChevronDown, ChevronUp, ZoomIn, FilterX, Layers, MapPin } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { ANOMALY_LABELS, ANOMALY_COLORS, STRATEGY_LABELS, SHIFT_LABELS } from '@/types';
-import type { AnomalyFlag, PickTask, TaskAnomaly } from '@/types';
+import { ANOMALY_LABELS, ANOMALY_COLORS, STRATEGY_LABELS, SHIFT_LABELS, STRATEGY_COLORS } from '@/types';
+import type { AnomalyFlag, PickTask, TaskAnomaly, StrategyType } from '@/types';
+import { buildRackZoneMap } from '@/services/mockAPI';
 
 function formatDuration(sec: number) {
   const m = Math.floor(sec / 60);
@@ -106,17 +107,21 @@ export function TaskSearchPanel() {
   const searchPanelOpen = useAppStore((s) => s.searchPanelOpen);
   const setSearchPanelOpen = useAppStore((s) => s.setSearchPanelOpen);
   const tasks = useAppStore((s) => s.tasks);
+  const structure = useAppStore((s) => s.structure);
   const taskAnomalies = useAppStore((s) => s.taskAnomalies);
   const searchFilter = useAppStore((s) => s.searchFilter);
   const setSearchKeyword = useAppStore((s) => s.setSearchKeyword);
   const toggleAnomalyOnly = useAppStore((s) => s.toggleAnomalyOnly);
   const toggleAnomalyFilter = useAppStore((s) => s.toggleAnomalyFilter);
   const togglePickerFilter = useAppStore((s) => s.togglePickerFilter);
+  const toggleZoneFilter = useAppStore((s) => s.toggleZoneFilter);
   const setTaskSort = useAppStore((s) => s.setTaskSort);
   const selectedTaskId = useAppStore((s) => s.selectedTaskId);
   const highlightedTaskIds = useAppStore((s) => s.highlightedTaskIds);
   const selectTask = useAppStore((s) => s.selectTask);
   const toggleHighlight = useAppStore((s) => s.toggleHighlight);
+  const drillDownZoneId = useAppStore((s) => s.drillDownZoneId);
+  const clearDrillDown = useAppStore((s) => s.clearDrillDown);
 
   const uniquePickers = useMemo(() => {
     const set = new Map<string, string>();
@@ -134,6 +139,7 @@ export function TaskSearchPanel() {
 
   const filteredTasks = useMemo(() => {
     let list = [...tasks];
+    const rackZoneMap = structure ? buildRackZoneMap(structure) : null;
     const kw = searchFilter.keyword.trim().toLowerCase();
     if (kw) {
       list = list.filter((t) => {
@@ -155,6 +161,14 @@ export function TaskSearchPanel() {
     }
     if (searchFilter.pickers.length > 0) {
       list = list.filter((t) => searchFilter.pickers.includes(t.pickerId));
+    }
+    if (searchFilter.zones.length > 0 && rackZoneMap) {
+      list = list.filter((t) =>
+        t.nodes.some((n) => searchFilter.zones.includes(rackZoneMap.get(n.rackId) ?? ''))
+      );
+    }
+    if (searchFilter.strategies.length > 0) {
+      list = list.filter((t) => searchFilter.strategies.includes(t.strategy));
     }
     list.sort((a, b) => {
       let av = 0;
@@ -180,7 +194,7 @@ export function TaskSearchPanel() {
       return searchFilter.sortDesc ? bv - av : av - bv;
     });
     return list;
-  }, [tasks, searchFilter, taskAnomalies]);
+  }, [tasks, searchFilter, taskAnomalies, structure]);
 
   const sortLabel: Record<string, string> = {
     time: '开始时间',
@@ -193,7 +207,9 @@ export function TaskSearchPanel() {
     setSearchKeyword('');
     while (searchFilter.anomalies.length) toggleAnomalyFilter(searchFilter.anomalies[0]);
     while (searchFilter.pickers.length) togglePickerFilter(searchFilter.pickers[0]);
+    while (searchFilter.zones.length) toggleZoneFilter(searchFilter.zones[0]);
     if (searchFilter.anomalyOnly) toggleAnomalyOnly();
+    if (drillDownZoneId) clearDrillDown();
   }
 
   if (!searchPanelOpen) return null;
@@ -241,17 +257,43 @@ export function TaskSearchPanel() {
           </div>
         </div>
 
+        {drillDownZoneId && structure && (
+          <div className="px-3 py-2 border-b border-white/10 bg-gradient-to-r from-cyan-500/10 via-transparent to-transparent">
+            {(() => {
+              const z = structure.zones.find((zz) => zz.id === drillDownZoneId);
+              if (!z) return null;
+              return (
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5" style={{ color: z.color }} />
+                  <div className="text-[11px] text-steel-300 flex-1">
+                    当前下钻 · <span className="font-mono font-bold" style={{ color: z.color }}>{z.name}</span>
+                    <span className="text-steel-500 mx-1">·</span>
+                    仅显示经过该区域的 <span className="text-steel-cyan">{filteredTasks.length}</span> 条任务
+                  </div>
+                  <button
+                    onClick={clearDrillDown}
+                    className="btn-icon text-[10px] h-5 gap-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                    退出
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         <div className="border-b border-white/10">
-          <button
+          <div
             onClick={() => setFilterExpanded(!filterExpanded)}
-            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/5 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/5 transition-colors cursor-pointer"
           >
             <div className="section-title !mb-0">
               <Filter className="w-3.5 h-3.5 text-cyan-400" />
               筛选条件
             </div>
             <div className="flex items-center gap-2">
-              {(searchFilter.anomalyOnly || searchFilter.anomalies.length > 0 || searchFilter.pickers.length > 0) && (
+              {(searchFilter.anomalyOnly || searchFilter.anomalies.length > 0 || searchFilter.pickers.length > 0 || searchFilter.zones.length > 0 || searchFilter.strategies.length > 0 || drillDownZoneId) && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -263,9 +305,11 @@ export function TaskSearchPanel() {
                   清空
                 </button>
               )}
-              {filterExpanded ? <ChevronUp className="w-4 h-4 text-steel-400" /> : <ChevronDown className="w-4 h-4 text-steel-400" />}
+              <div className="cursor-pointer pointer-events-auto">
+                {filterExpanded ? <ChevronUp className="w-4 h-4 text-steel-400" /> : <ChevronDown className="w-4 h-4 text-steel-400" />}
+              </div>
             </div>
-          </button>
+          </div>
           {filterExpanded && (
             <div className="px-4 pb-3 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -319,6 +363,76 @@ export function TaskSearchPanel() {
                       >
                         <User className="w-3 h-3 mr-1 inline-block" />
                         {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] text-steel-500 mb-1.5 uppercase tracking-wider flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  库区
+                  {drillDownZoneId && (
+                    <span className="text-[10px] text-cyan-400 ml-1 px-1.5 py-px rounded bg-cyan-500/15 border border-cyan-400/30">
+                      已下钻
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {structure?.zones.map((z) => {
+                    const active = searchFilter.zones.includes(z.id);
+                    return (
+                      <button
+                        key={z.id}
+                        onClick={() => toggleZoneFilter(z.id)}
+                        className="chip text-[11px] font-mono"
+                        style={{
+                          backgroundColor: active ? `${z.color}22` : 'transparent',
+                          color: active ? z.color : undefined,
+                          borderColor: active ? `${z.color}55` : undefined,
+                        }}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-sm inline-block mr-1"
+                          style={{ backgroundColor: z.color, boxShadow: active ? `0 0 4px ${z.color}` : undefined }}
+                        />
+                        {z.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] text-steel-500 mb-1.5 uppercase tracking-wider flex items-center gap-1">
+                  <Layers className="w-3 h-3" />
+                  拣货策略
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(['S_SHAPED', 'ZONED_RELAY', 'WAVE_PICKING'] as StrategyType[]).map((s) => {
+                    const active = searchFilter.strategies.includes(s);
+                    const color = STRATEGY_COLORS[s];
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => {
+                          const cur = searchFilter.strategies;
+                          useAppStore.setState({
+                            searchFilter: {
+                              ...searchFilter,
+                              strategies: cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s],
+                            },
+                          });
+                        }}
+                        className="chip text-[11px] font-mono transition-all"
+                        style={{
+                          backgroundColor: active ? `${color}22` : 'transparent',
+                          color: active ? color : undefined,
+                          borderColor: active ? `${color}55` : undefined,
+                        }}
+                      >
+                        {STRATEGY_LABELS[s]}
                       </button>
                     );
                   })}

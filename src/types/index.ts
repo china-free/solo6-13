@@ -20,6 +20,8 @@ export interface TaskSearchFilter {
   anomalyOnly: boolean;
   anomalies: AnomalyFlag[];
   pickers: string[];
+  zones: string[];
+  strategies: StrategyType[];
   sortKey: TaskSortKey;
   sortDesc: boolean;
 }
